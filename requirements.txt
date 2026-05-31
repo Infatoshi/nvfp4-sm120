@@ -1,0 +1,11 @@
+# Core pipeline (sm_120 / RTX PRO 6000 Blackwell, CUDA 13):
+#   torch built against cu13 (tested: 2.11.0+cu130)
+#   torchao providing torchao.prototype.mx_formats.nvfp4_tensor (tested: 0.17.0)
+#   triton for the fused quant kernel (tested: 3.6.0)
+# nvcc from a CUDA 13 toolkit is required to JIT-build nvfp4_cuda.py (sm_120a).
+torch>=2.11
+torchao>=0.17
+triton>=3.6
+
+# Optional, only for the te/ comparison scripts (Transformer Engine on sm_120):
+# transformer-engine[pytorch]==2.15.0

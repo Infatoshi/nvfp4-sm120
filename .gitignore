@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.so
+*.o
+*.ninja*
+.cache/
+build/
+*.log
+*.out
+.DS_Store

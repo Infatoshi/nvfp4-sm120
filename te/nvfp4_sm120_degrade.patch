@@ -1,0 +1,59 @@
+--- quantization.py.orig.bak	2026-05-29 15:08:05.555227803 -0600
++++ quantization.py	2026-05-29 15:08:55.277179085 -0600
+@@ -139,10 +139,56 @@
+         recipe_supported, unsupported_reason = check_fp8_block_scaling_support()
+     elif isinstance(recipe, MXFP8BlockScaling):
+         recipe_supported, unsupported_reason = check_mxfp8_support()
++    elif isinstance(recipe, NVFP4BlockScaling):
++        recipe_supported, unsupported_reason = check_nvfp4_support()
++        if recipe_supported:
++            _maybe_degrade_nvfp4_on_sm120(recipe)
+     if not recipe_supported:
+         raise RuntimeError(unsupported_reason)
+ 
+ 
++_NVFP4_SM120_WARNED = False
++
++
++def _maybe_degrade_nvfp4_on_sm120(recipe: NVFP4BlockScaling) -> None:
++    """Work around the fused RHT / stochastic-rounding GEMM kernel not running on
++    sm_120 (workstation/GeForce Blackwell).
++
++    That kernel (row_cast_col_hadamard_transform_cast_fusion.cu) requests dynamic
++    shared memory sized for sm_100's ~232 KB budget, which exceeds sm_120's
++    101376-byte opt-in cap; cudaFuncSetAttribute(MaxDynamicSharedMemorySize, ...)
++    then fails with "invalid argument". The plain NVFP4 GEMM (2D weight scaling +
++    round-to-nearest) is unaffected, so we disable RHT and stochastic rounding on
++    sm_120 so the recipe still runs, in degraded form, instead of crashing.
++    """
++    global _NVFP4_SM120_WARNED
++    if get_device_compute_capability() != (12, 0):
++        return
++    qparams = (recipe.fp4_quant_fwd_inp, recipe.fp4_quant_fwd_weight, recipe.fp4_quant_bwd_grad)
++    changed = False
++    for qp in qparams:  # QParams are frozen dataclasses -> bypass via object.__setattr__
++        if getattr(qp, "random_hadamard_transform", False):
++            object.__setattr__(qp, "random_hadamard_transform", False)
++            changed = True
++        if getattr(qp, "stochastic_rounding", False):
++            object.__setattr__(qp, "stochastic_rounding", False)
++            changed = True
++    if changed:
++        recipe.disable_rht = True
++        recipe.disable_stochastic_rounding = True
++        if not _NVFP4_SM120_WARNED:
++            _NVFP4_SM120_WARNED = True
++            warnings.warn(
++                "NVFP4: Random Hadamard Transform and stochastic rounding are not "
++                "supported on sm_120 (the fused kernel exceeds the 101376-byte "
++                "shared-memory opt-in cap); disabling them. NVFP4 will run with 2D "
++                "weight scaling + round-to-nearest only. Convergence may be reduced "
++                "vs. the full recipe; keep numerically sensitive layers in higher "
++                "precision.",
++                UserWarning,
++            )
++
++
+ def get_default_fp8_recipe() -> Recipe:
+     """FP8 recipe with default args."""
+     assert not torch.compiler.is_compiling(), (
