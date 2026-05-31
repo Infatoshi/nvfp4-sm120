@@ -1,0 +1,8 @@
+{"tag": "bf16_256", "backend": "bf16", "dim": 256, "nl": 6, "N": 4721920, "tokens": 19988480, "val_loss": 5.889966022968292, "steps": 305, "minutes": 0.957382881641388}
+{"tag": "nvfp4_256", "backend": "nvfp4", "dim": 256, "nl": 6, "N": 4721920, "tokens": 19988480, "val_loss": 5.900990682840347, "steps": 305, "minutes": 2.9514183402061462}
+{"tag": "bf16_384", "backend": "bf16", "dim": 384, "nl": 6, "N": 10621824, "tokens": 19988480, "val_loss": 5.709941726922989, "steps": 305, "minutes": 1.2484926184018452}
+{"tag": "nvfp4_384", "backend": "nvfp4", "dim": 384, "nl": 6, "N": 10621824, "tokens": 19988480, "val_loss": 5.760024273395539, "steps": 305, "minutes": 4.7431086222330725}
+{"tag": "bf16_512", "backend": "bf16", "dim": 512, "nl": 8, "N": 25174528, "tokens": 19988480, "val_loss": 5.731059628725052, "steps": 305, "minutes": 1.7137385288874307}
+{"tag": "nvfp4_512", "backend": "nvfp4", "dim": 512, "nl": 8, "N": 25174528, "tokens": 19988480, "val_loss": 5.664782190322876, "steps": 305, "minutes": 9.146058515707653}
+{"tag": "bf16_640", "backend": "bf16", "dim": 640, "nl": 10, "N": 49165440, "tokens": 19988480, "val_loss": 5.618311023712158, "steps": 305, "minutes": 2.4187458912531534}
+{"tag": "nvfp4_640", "backend": "nvfp4", "dim": 640, "nl": 10, "N": 49165440, "tokens": 19988480, "val_loss": 5.649015432596206, "steps": 305, "minutes": 14.955180064837139}

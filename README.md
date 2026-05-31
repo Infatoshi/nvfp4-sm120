@@ -30,6 +30,8 @@ nvfp4_triton.py          Standalone Triton software-SR quantizer (the first corr
 benchmarks/              Throughput + roofline profiling scripts.
 tests/                   Numerical-correctness and convergence checks.
 te/                      Transformer Engine comparison: TE trainer, benches, sm_120 degrade patch.
+scaling/                 Real-text (OpenWebText) Chinchilla-style L(N) study: BF16 vs NVFP4.
+results/                 scaling_results.jsonl + scaling_law.png (the figure).
 ```
 
 Backend for `nvfp4_train.py` is selected by env var (default: pure-torch quant):
@@ -88,6 +90,16 @@ microbatched FFN step (d4096, h14336) this cut 437→122 ms at G=8 and 875→241
 training still converges to bf16 parity. Note the large factor is partly because the
 non-amortized baseline re-quantizes the weight on every fprop+dgrad across all G
 microbatches — a real microbatched win, but G-coupled, not universal.
+
+## Scaling law on real text (OpenWebText)
+
+Beyond the synthetic addition task, NVFP4 was validated on language modeling: a family of
+nanoGPT-style decoders trained on OpenWebText (GPT-2 BPE) in BF16 vs NVFP4, fit to
+L(N)=E+A*N^-alpha. **The two scaling laws are statistically indistinguishable** — BF16
+L=5.53+745*N^-0.500, NVFP4 L=5.52+823*N^-0.500 (same exponent, near-identical irreducible
+loss; per-point val-loss gaps <=0.07, within run noise). NVFP4 does not degrade LM
+generalization at the tested scales (4.7M-49M params, ~20M tokens each). See `scaling/`
+for the study and `results/scaling_law.png` for the figure.
 
 ## Gotchas
 
