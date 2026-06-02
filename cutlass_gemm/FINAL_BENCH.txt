@@ -1,0 +1,3 @@
+GPU util before: 0 %
+4096: Passed TFLOPS: 1421.34
+8192: Passed TFLOPS: 1591.23

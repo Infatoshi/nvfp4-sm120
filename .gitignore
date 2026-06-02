@@ -8,3 +8,8 @@ build/
 *.log
 *.out
 .DS_Store
+
+# compiled CUTLASS GEMM binaries (built locally via build.sh / build_bf16out.sh)
+cutlass_gemm/nvfp4_gemm_*
+!cutlass_gemm/*.cu
+!cutlass_gemm/*.sh
