@@ -177,14 +177,35 @@ skinny/K-heavy and were NEVER tuned past the cuBLAS baseline. They are:
 | 512   | 2048 | 16384 | down.wgrad | 24.4% |
 | 2048  | 512  | 16384 | up.wgrad | 24.7% |
 
-CRITICAL open question for these: roofline first. Several are tiny (512x512x16384 is
-only 8.6 GFLOP) and are likely bandwidth-bound, not compute-bound. For a
-bandwidth-bound shape, 80% of the 2000-TFLOPS compute peak is physically impossible;
-the honest ceiling is the memory-bandwidth roofline (~1.79 TB/s GDDR7) and the
-target should be 80% of THAT, reported as %-of-BW-roofline. Do not chase a compute
-SOL the roofline forbids. Skinny tiles (128x32, 128x64, 256x128) were built to try
-to improve occupancy on these shapes but are NOT yet benchmarked. Split-K / stream-K
-along the huge K=16384 dimension is the other untried lever.
+ROOFLINE DONE (cutlass_gemm/roofline.py, pure arithmetic, no GPU). This settles what
+the target even is. Card: dense FP4 peak 2000 TFLOPS, GDDR7 BW 1792 GB/s, ridge point
+1116 FLOP/byte. NVFP4 inputs 0.5 byte/elem + e4m3 block scales (1 byte/16) + bf16
+output. Result:
+
+| M | N | K | bound | real ceiling TFLOPS | =% of 2000 | cuBLAS now | cuBLAS % of REAL ceiling |
+|---|---|---|---|---|---|---|---|
+| 16384 | 512  | 512   | BW   | 711  | 35.5% | 11.5% | 32.3% |
+| 16384 | 512  | 2048  | BW   | 1699 | 85.0% | 33.0% | 38.8% |
+| 16384 | 2048 | 512   | BW   | 850  | 42.5% | 17.6% | 41.4% |
+| 512   | 512  | 16384 | BW   | 1545 | 77.3% |  6.3% |  8.2% |
+| 512   | 2048 | 16384 | comp | 2000 | 100%  | 24.4% | 24.4% |
+| 2048  | 512  | 16384 | comp | 2000 | 100%  | 24.7% | 24.7% |
+
+KEY CONCLUSION: "80% of 2000 TFLOPS" (1600) is PHYSICALLY IMPOSSIBLE on 4 of the 6
+shapes - they are memory-bandwidth-bound, and even a kernel that perfectly saturates
+1.79 TB/s cannot exceed AI*BW (e.g. 16384x512x512 is hard-capped at 711 TFLOPS = 35.5%
+of the compute peak). No CUTLASS tuning moves a memory wall. The only honest target is
+80% of each shape's APPLICABLE roofline (compute peak for the 2 compute-bound shapes,
+AI*BW for the 4 BW-bound ones). Measured against that real ceiling, cuBLAS sits at
+8-41%, so there is still real headroom everywhere - just not to 1600 TFLOPS on the
+skinny shapes. The two K=16384 compute-bound shapes (512x2048x16384, 2048x512x16384)
+are the ones where the full 80%-of-2000 push is meaningful.
+
+Skinny tiles (128x32, 128x64, 256x128) were built to improve occupancy on the
+small-M/N shapes but are NOT yet benchmarked. Split-K / stream-K along the huge
+K=16384 dimension is the key untried lever for the wgrad shapes (4,5,6): K=16384 with
+tiny M,N means one CTA does a very long serial K-reduction with little parallelism, so
+splitting K across CTAs should help occupancy and approach the BW/compute ceiling.
 
 Resume checklist:
 1. `ssh anvil-lan`, confirm GPU idle (nvidia-smi 0% util). Note: GPU clock may be
@@ -192,7 +213,18 @@ Resume checklist:
    benchmarking, or leave locked for stable numbers.
 2. Benchmark PENDING-A (bf16out variants) at 4096/8192/16384, append a verified
    "## Square-shape push" section to `cutlass_gemm/RESULTS.md`.
-3. Roofline each of the six training shapes, classify compute- vs bandwidth-bound,
-   then benchmark/tune (skinny tiles, split-K), append "## Training shapes" to
-   RESULTS.md with %-of-applicable-roofline clearly labeled.
+3. Roofline DONE (roofline.py). Now benchmark/tune the six shapes against their REAL
+   ceiling (table above): the 2 compute-bound K=16384 shapes target 80% of 2000; the 4
+   BW-bound shapes target 80% of their AI*BW ceiling. Key lever for wgrad shapes is
+   split-K/stream-K. Append "## Training shapes" to RESULTS.md with %-of-applicable-
+   roofline clearly labeled (NOT %-of-2000 for the BW-bound ones - that would be
+   dishonest since 1600 is unreachable there).
 4. Only count a number if its command exited 0 and Disposition: Passed.
+
+NOTE ON THE STATED GOAL: "80%+ SOL on all NVFP4 GEMM calls" where SOL=2000 TFLOPS is
+not achievable on the 4 bandwidth-bound training shapes by physics, regardless of
+kernel quality. This is documented above with the arithmetic. The achievable
+reinterpretation is 80% of each shape's applicable roofline. This needs a human call
+on whether to (a) accept the roofline-relative target, (b) change the GEMM shapes
+(bigger batch/tokens to make them compute-bound), or (c) accept that cuBLAS is already
+near-ceiling on some shapes and only chase the compute-bound ones.
